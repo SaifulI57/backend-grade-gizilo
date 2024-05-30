@@ -2,7 +2,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sklearn.preprocessing import LabelEncoder
-from starlette.responses import JSONResponse, JSONDecodeError
+from starlette.responses import JSONResponse
 from typing import Any, List, Dict
 from dotenv import load_dotenv
 import tensorflow as tf
@@ -10,29 +10,6 @@ import pandas as pd
 import numpy as np
 import os
 
-
-class CorsAndRefererMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app: FastAPI, allowed_origins: List[str]):
-        super().__init__(app)
-        self.allowed_origins = allowed_origins
-        
-    async def dispatch(self, request, call_next):
-        # Check the request origin
-        origin = request.headers.get("Origin")
-        if origin not in self.allowed_origins:
-            raise HTTPException(status_code=403, detail="Origin not allowed")
-
-        # Check the Referer header
-        referer = request.headers.get("Referer")
-        if not referer:
-            raise HTTPException(status_code=403, detail="Referer header missing")
-        if referer not in self.allowed_origins:
-            raise HTTPException(status_code=403, detail="Where are you from bruh🤨")
-
-        # Call the next middleware in the stack
-        response = await call_next(request)
-
-        return response
     
 def init_model():
     le = LabelEncoder()
@@ -47,7 +24,7 @@ class BaseAPI:
         self.app = FastAPI()
         self.setup_api()
         self.setup_middleware()
-        self.le, self.model = init_model()  # Initialize model and LabelEncoder
+        self.le, self.model = init_model()  
     
     def setup_api(self):
         self.app.post("/api/v1/nutrient")(self.process_nutrient)
@@ -65,8 +42,7 @@ class BaseAPI:
             predicted_class = self.le.inverse_transform(np.argmax(predictions, axis=1))[0]
         
             return JSONResponse(content={"result": predicted_class})
-        except JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid JSON data provided")
+        
         except KeyError:
             raise HTTPException(status_code=400, detail="Invalid keys provided in JSON data")
         except Exception as e:
@@ -77,15 +53,11 @@ class BaseAPI:
         allowed_origins = os.getenv("allowed_origins", "").split(",")
         
         self.app.add_middleware(
-            CorsAndRefererMiddleware,
-            allowed_origins=allowed_origins
-        )
-        
-        self.app.add_middleware(
             CORSMiddleware,
             allow_origins=allowed_origins,
+            allow_credentials=True,
             allow_methods=["POST"],
-            allow_headers=["referer"]
+            allow_headers=["Content-Type"]
         )
         
 
