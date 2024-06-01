@@ -1,0 +1,11 @@
+version: '3.10'
+
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: api_grade
+    ports:
+      - "8080:8080"
